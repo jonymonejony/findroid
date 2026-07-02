@@ -105,11 +105,12 @@ class JellyfinRepositoryOfflineImpl(
         sortBy: SortBy,
         sortOrder: SortOrder,
     ): Flow<PagingData<FindroidItem>> {
-        TODO("Not yet implemented")
+        // Offline mode doesn't support paging, return empty flow
+        return androidx.paging.PagingData.empty()
     }
 
     override suspend fun getPerson(personId: UUID): FindroidPerson {
-        TODO("Not yet implemented")
+        throw Exception("Person data not available in offline mode")
     }
 
     override suspend fun getPersonItems(
@@ -117,11 +118,29 @@ class JellyfinRepositoryOfflineImpl(
         includeTypes: List<BaseItemKind>?,
         recursive: Boolean,
     ): List<FindroidItem> {
-        TODO("Not yet implemented")
+        // Person items not available in offline mode
+        return emptyList()
     }
 
     override suspend fun getFavoriteItems(): List<FindroidItem> {
-        TODO("Not yet implemented")
+        return withContext(Dispatchers.IO) {
+            val movies =
+                database
+                    .getMoviesByServerId(getCurrentServerId())
+                    .map { it.toFindroidMovie(database, getUserId()) }
+                    .filter { it.userData?.favorite == true }
+            val shows =
+                database
+                    .getShowsByServerId(getCurrentServerId())
+                    .map { it.toFindroidShow(database, getUserId()) }
+                    .filter { it.userData?.favorite == true }
+            val episodes =
+                database
+                    .getEpisodesByServerId(getCurrentServerId())
+                    .map { it.toFindroidEpisode(database, getUserId()) }
+                    .filter { it.userData?.favorite == true }
+            movies + shows + episodes
+        }
     }
 
     override suspend fun getSearchItems(query: String): List<FindroidItem> {
@@ -219,7 +238,8 @@ class JellyfinRepositoryOfflineImpl(
         }
 
     override suspend fun getStreamUrl(itemId: UUID, mediaSourceId: String): String {
-        TODO("Not yet implemented")
+        // Offline mode doesn't have a valid stream URL
+        throw IllegalStateException("Cannot get stream URL in offline mode")
     }
 
     override suspend fun getSegments(itemId: UUID): List<FindroidSegment> =
@@ -310,7 +330,8 @@ class JellyfinRepositoryOfflineImpl(
     }
 
     override suspend fun updateDeviceName(name: String) {
-        TODO("Not yet implemented")
+        // Offline mode doesn't support device name updates
+        // This is a no-op in offline mode
     }
 
     override suspend fun getUserConfiguration(): UserConfiguration? {
