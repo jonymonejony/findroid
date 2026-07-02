@@ -195,9 +195,6 @@ class MPVPlayer(
         mpvLib.setOptionString("sub-use-margins", "no")
 
         // Language
-        // Split on "-" and use last part because media3 does some weird mapping
-        // See
-        // https://github.com/androidx/media/blob/1.4.0/libraries/common/src/main/java/androidx/media3/common/util/Util.java#L3742
         trackSelectionParameters.preferredAudioLanguages.firstOrNull()?.let {
             mpvLib.setOptionString("alang", it.split("-").last())
         }
@@ -467,9 +464,6 @@ class MPVPlayer(
                 }
                 MpvEvent.MPV_EVENT_END_FILE -> {
                     Timber.e("MPV_EVENT_END_FILE - File playback ended")
-                    // Check if this is an error or normal end of file
-                    // In MPV, we need to check the end-file reason
-                    // For now, treat all END_FILE events as potential errors if player is ready
                     if (isPlayerReady) {
                         // Try to get the error reason from MPV
                         val endFileReason = mpvLib.getPropertyInt("end-file")
@@ -477,9 +471,10 @@ class MPVPlayer(
                             // This is an error
                             playerError = PlaybackException(
                                 "Playback failed with error code: $endFileReason",
-                                null
+                                null,
+                                PlaybackException.ERROR_CODE_UNSPECIFIED
                             )
-                            setPlayerStateAndNotifyIfChanged(playbackState = STATE_ERROR)
+                            setPlayerStateAndNotifyIfChanged(playbackState = STATE_IDLE)
                             listeners.sendEvent(EVENT_PLAYER_ERROR) { listener ->
                                 listener.onPlayerError(playerError!!)
                             }
@@ -491,6 +486,17 @@ class MPVPlayer(
                             } else {
                                 setPlayerStateAndNotifyIfChanged(playbackState = STATE_ENDED)
                             }
+                        }
+                    } else {
+                        // If the file ends before it was ready, it failed to load
+                        playerError = PlaybackException(
+                            "Failed to load media item",
+                            null,
+                            PlaybackException.ERROR_CODE_UNSPECIFIED
+                        )
+                        setPlayerStateAndNotifyIfChanged(playbackState = STATE_IDLE)
+                        listeners.sendEvent(EVENT_PLAYER_ERROR) { listener ->
+                            listener.onPlayerError(playerError!!)
                         }
                     }
                 }
@@ -518,9 +524,9 @@ class MPVPlayer(
                         for (videoListener in videoListeners) {
                             videoListener.onRenderedFirstFrame()
                         }
-                    } else {
-                        setPlayerStateAndNotifyIfChanged(playbackState = STATE_READY)
                     }
+                    // Always ensure the state is READY when playback restarts
+                    setPlayerStateAndNotifyIfChanged(playbackState = STATE_READY)
                 }
                 else -> Unit
             }

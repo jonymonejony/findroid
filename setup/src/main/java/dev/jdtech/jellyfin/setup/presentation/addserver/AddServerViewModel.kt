@@ -6,7 +6,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.models.DiscoveredServer
 import dev.jdtech.jellyfin.models.ExceptionUiText
-import dev.jdtech.jellyfin.models.ExceptionUiTexts
 import dev.jdtech.jellyfin.models.UiText
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import dev.jdtech.jellyfin.setup.domain.SetupRepository
@@ -57,15 +56,14 @@ constructor(private val repository: SetupRepository, private val appPreferences:
                 eventsChannel.send(AddServerEvent.Success)
             } catch (_: CancellationException) {} catch (e: ExceptionUiText) {
                 _state.emit(_state.value.copy(isLoading = false, error = listOf(e.uiText)))
-            } catch (e: ExceptionUiTexts) {
-                _state.emit(_state.value.copy(isLoading = false, error = e.uiTexts))
             } catch (e: Exception) {
+                val message = e.message
                 _state.emit(
                     _state.value.copy(
                         isLoading = false,
                         error =
                             listOf(
-                                if (e.message != null) UiText.DynamicString(e.message)
+                                if (message != null) UiText.DynamicString(message)
                                 else UiText.StringResource(CoreR.string.unknown_error)
                             ),
                     )

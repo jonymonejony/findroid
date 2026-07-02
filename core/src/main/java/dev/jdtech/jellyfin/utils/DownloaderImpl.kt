@@ -69,8 +69,8 @@ class DownloaderImpl(
             val storageLocation = context.getExternalFilesDirs(null)[storageIndex]
             if (
                 storageLocation == null ||
-                    Environment.getExternalStorageState(storageLocation) !=
-                        Environment.MEDIA_MOUNTED
+                Environment.getExternalStorageState(storageLocation) !=
+                Environment.MEDIA_MOUNTED
             ) {
                 return@coroutineScope Pair(
                     -1,
@@ -154,9 +154,10 @@ class DownloaderImpl(
                 deleteItem(item, source)
             } catch (_: Exception) {}
             Timber.e(e)
+            val message = e.message
             return@coroutineScope Pair(
                 -1,
-                if (e.message != null) UiText.DynamicString(e.message)
+                if (message != null) UiText.DynamicString(message)
                 else UiText.StringResource(CoreR.string.unknown_error),
             )
         }
@@ -262,17 +263,19 @@ class DownloaderImpl(
             database.insertMediaStream(
                 mediaStream.toFindroidMediaStreamDto(id, source.id, streamPath.path.orEmpty())
             )
-            val request =
-                mediaStream.path?.let { DownloadManager.Request(it.toUri()) }
-                    .setTitle(mediaStream.title)
-                    .setAllowedOverMetered(
-                        appPreferences.getValue(appPreferences.downloadOverMobileData)
-                    )
-                    .setAllowedOverRoaming(
-                        appPreferences.getValue(appPreferences.downloadWhenRoaming)
-                    )
-                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
-                    .setDestinationUri(streamPath)
+
+            val path = mediaStream.path ?: continue
+            val request = DownloadManager.Request(path.toUri())
+                .setTitle(mediaStream.title)
+                .setAllowedOverMetered(
+                    appPreferences.getValue(appPreferences.downloadOverMobileData)
+                )
+                .setAllowedOverRoaming(
+                    appPreferences.getValue(appPreferences.downloadWhenRoaming)
+                )
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
+                .setDestinationUri(streamPath)
+
             val downloadId = downloadManager.enqueue(request)
             database.setMediaStreamDownloadId(id, downloadId)
         }
@@ -285,10 +288,10 @@ class DownloaderImpl(
     ) {
         val maxIndex =
             ceil(
-                    trickplayInfo.thumbnailCount
-                        .toDouble()
-                        .div(trickplayInfo.tileWidth * trickplayInfo.tileHeight)
-                )
+                trickplayInfo.thumbnailCount
+                    .toDouble()
+                    .div(trickplayInfo.tileWidth * trickplayInfo.tileHeight)
+            )
                 .toInt()
         val byteArrays = mutableListOf<ByteArray>()
         for (i in 0 until maxIndex) {

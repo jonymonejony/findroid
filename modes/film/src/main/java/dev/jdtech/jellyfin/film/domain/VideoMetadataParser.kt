@@ -89,18 +89,15 @@ object VideoMetadataParser {
                                 else -> null
                             }?.let { displayProfiles.add(it) }
 
-                            /**
-                             * Force stream [org.jellyfin.sdk.model.api.MediaStream.height] and
-                             * [org.jellyfin.sdk.model.api.MediaStream.width] as not null since we
-                             * are inside [MediaStreamType.VIDEO] block
-                             */
+                            val h = height
+                            val w = width
                             resolution.add(
                                 when {
-                                    height != null && width != null && height <= 1080 && width <= 1920 -> {
+                                    h != null && w != null && h <= 1080 && w <= 1920 -> {
                                         Resolution.HD
                                     }
 
-                                    height != null && width != null && height <= 2160 && width <= 3840 -> {
+                                    h != null && w != null && h <= 2160 && w <= 3840 -> {
                                         Resolution.UHD
                                     }
 

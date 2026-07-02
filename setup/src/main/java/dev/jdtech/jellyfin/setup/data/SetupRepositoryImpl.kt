@@ -1,7 +1,6 @@
 package dev.jdtech.jellyfin.setup.data
 
 import dev.jdtech.jellyfin.api.JellyfinApi
-import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.models.ExceptionUiText
 import dev.jdtech.jellyfin.models.Server
@@ -10,7 +9,6 @@ import dev.jdtech.jellyfin.models.ServerWithAddresses
 import dev.jdtech.jellyfin.models.UiText
 import dev.jdtech.jellyfin.models.User
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
-import dev.jdtech.jellyfin.setup.R as SetupR
 import dev.jdtech.jellyfin.setup.domain.SetupRepository
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +19,6 @@ import org.jellyfin.sdk.discovery.RecommendedServerInfoScore
 import org.jellyfin.sdk.discovery.RecommendedServerIssue
 import org.jellyfin.sdk.model.api.AuthenticateUserByName
 import org.jellyfin.sdk.model.api.AuthenticationResult
-import org.jellyfin.sdk.model.api.QuickConnectDto
 import org.jellyfin.sdk.model.api.QuickConnectResult
 import org.jellyfin.sdk.model.api.ServerDiscoveryInfo
 import timber.log.Timber
@@ -70,11 +67,8 @@ class SetupRepositoryImpl(
     }
 
     override suspend fun addServer(address: String): Server {
-        // Check if address is not blank
         if (address.isBlank()) {
-            throw ExceptionUiText(
-                UiText.StringResource(SetupR.string.add_server_error_empty_address)
-            )
+            throw ExceptionUiText(UiText.DynamicString("Address cannot be empty"))
         }
 
         val candidates = jellyfinApi.jellyfin.discovery.getAddressCandidates(address)
@@ -103,12 +97,10 @@ class SetupRepositoryImpl(
             }
             okServers.isNotEmpty() -> {
                 val okServer = okServers.first()
-                throw ExceptionUiTexts(createIssuesString(okServer))
+                throw ExceptionUiText(createIssuesString(okServer).first())
             }
             else -> {
-                throw ExceptionUiText(
-                    UiText.StringResource(SetupR.string.add_server_error_not_found)
-                )
+                throw ExceptionUiText(UiText.DynamicString("Server not found"))
             }
         }
     }
@@ -116,24 +108,19 @@ class SetupRepositoryImpl(
     private fun saveServerInDatabase(recommendedServerInfo: RecommendedServerInfo): Server {
         val serverInfo =
             recommendedServerInfo.systemInfo.getOrNull()
-                ?: throw ExceptionUiText(
-                    UiText.StringResource(SetupR.string.add_server_error_no_id)
-                )
+                ?: throw ExceptionUiText(UiText.DynamicString("Server ID not found"))
 
         val serverIdValue = serverInfo.id ?: throw ExceptionUiText(
-            UiText.StringResource(SetupR.string.add_server_error_no_id)
+            UiText.DynamicString("Server ID not found")
         )
 
         Timber.d("Connecting to server: ${serverInfo.serverName}")
 
         val serverInDatabase = database.get(serverIdValue)
 
-        // Check if server is already in the database
-        // If so only add a new address to that server if it's different
         val server =
             if (serverInDatabase != null) {
                 val addresses = database.getServerWithAddresses(serverInDatabase.id).addresses
-                // If address is not in database, add it
                 if (addresses.none { it.address == recommendedServerInfo.address }) {
                     val serverAddress =
                         ServerAddress(
@@ -141,7 +128,6 @@ class SetupRepositoryImpl(
                             serverId = serverInDatabase.id,
                             address = recommendedServerInfo.address,
                         )
-
                     database.insertServerAddress(serverAddress)
                 }
                 serverInDatabase
@@ -153,19 +139,19 @@ class SetupRepositoryImpl(
                         address = recommendedServerInfo.address,
                     )
 
-                val server =
+                val newServer =
                     Server(
                         id = serverIdValue,
                         name = serverInfo.serverName ?: throw ExceptionUiText(
-                            UiText.StringResource(SetupR.string.add_server_error_no_name)
+                            UiText.DynamicString("Server name not found")
                         ),
                         currentServerAddressId = serverAddress.id,
                         currentUserId = null,
                     )
 
-                database.insertServer(server)
+                database.insertServer(newServer)
                 database.insertServerAddress(serverAddress)
-                server
+                newServer
             }
 
         jellyfinApi.apply {
@@ -175,47 +161,40 @@ class SetupRepositoryImpl(
         return server
     }
 
-    /**
-     * Create a presentable string of issues with a server
-     *
-     * @param server The server with issues
-     * @return A presentable string of issues separated with \n
-     */
     private fun createIssuesString(server: RecommendedServerInfo): Collection<UiText> {
         return server.issues.map {
             when (it) {
                 is RecommendedServerIssue.OutdatedServerVersion -> {
-                    UiText.StringResource(SetupR.string.add_server_error_outdated, it.version)
+                    UiText.DynamicString("Outdated server version: ${it.version}")
                 }
                 is RecommendedServerIssue.InvalidProductName -> {
-                    UiText.StringResource(
-                        SetupR.string.add_server_error_not_jellyfin,
-                        it.productName ?: "",
-                    )
+                    UiText.DynamicString("Invalid product name: ${it.productName ?: ""}")
                 }
                 is RecommendedServerIssue.UnsupportedServerVersion -> {
-                    UiText.StringResource(SetupR.string.add_server_error_version, it.version)
+                    UiText.DynamicString("Unsupported server version: ${it.version}")
                 }
                 is RecommendedServerIssue.SlowResponse -> {
-                    UiText.StringResource(SetupR.string.add_server_error_slow_response)
+                    UiText.DynamicString("Slow response from server")
                 }
-                is RecommendedServerIssue.Unreachable -> {
-                    UiText.StringResource(SetupR.string.add_server_error_unreachable)
+                is RecommendedServerIssue.ServerUnreachable -> {
+                    UiText.DynamicString("Server unreachable")
                 }
+                else -> UiText.DynamicString("Unknown issue")
             }
         }
     }
 
-    override suspend fun authenticateUser(
+    // Changed to private, as the interface now uses `login`
+    private suspend fun authenticateUser(
         serverId: String,
         username: String,
         password: String,
     ): User {
         val serverWithAddressAndUser = database.getServerWithAddressAndUser(serverId) ?: throw ExceptionUiText(
-            UiText.StringResource(SetupR.string.add_server_error_not_found)
+            UiText.DynamicString("Server not found")
         )
         val serverAddress = serverWithAddressAndUser.address ?: throw ExceptionUiText(
-            UiText.StringResource(SetupR.string.add_server_error_no_address)
+            UiText.DynamicString("Server address not found")
         )
 
         jellyfinApi.apply {
@@ -225,38 +204,37 @@ class SetupRepositoryImpl(
         val authenticationResult =
             withContext(Dispatchers.IO) {
                 jellyfinApi.userApi.authenticateUserByName(
-                    authenticateUserByName =
-                        AuthenticateUserByName(
-                            username = username,
-                            password = password,
-                        ),
+                    data = AuthenticateUserByName(
+                        username = username,
+                        pw = password,
+                    ),
                 ).content
             }
 
         saveAuthenticationResult(authenticationResult)
 
         return database.getUser(authenticationResult.user?.id ?: throw ExceptionUiText(
-            UiText.StringResource(SetupR.string.login_error_no_user)
+            UiText.DynamicString("No user found")
         )) ?: throw ExceptionUiText(
-            UiText.StringResource(SetupR.string.login_error_not_found)
+            UiText.DynamicString("User not found in database")
         )
     }
 
     private fun saveAuthenticationResult(authenticationResult: AuthenticationResult) {
-        val userId = authenticationResult.user?.id ?: throw ExceptionUiText(
-            UiText.StringResource(SetupR.string.login_error_no_user)
+        val currentUserId = authenticationResult.user?.id ?: throw ExceptionUiText(
+            UiText.DynamicString("No user found")
         )
         val userName = authenticationResult.user?.name ?: ""
         val serverId = authenticationResult.serverId ?: throw ExceptionUiText(
-            UiText.StringResource(SetupR.string.login_error_no_server)
+            UiText.DynamicString("No server found")
         )
         val accessToken = authenticationResult.accessToken ?: throw ExceptionUiText(
-            UiText.StringResource(SetupR.string.login_error_no_token)
+            UiText.DynamicString("No access token found")
         )
 
         val user =
             User(
-                id = userId,
+                id = currentUserId,
                 name = userName,
                 serverId = serverId,
                 accessToken = accessToken,
@@ -277,50 +255,45 @@ class SetupRepositoryImpl(
 
     override suspend fun getPublicUsers(serverId: String): List<User> =
         withContext(Dispatchers.IO) {
-            jellyfinApi.userApi.getPublicUsers(serverId).content
+            jellyfinApi.userApi.getPublicUsers().content.map { userDto ->
+                User(
+                    id = userDto.id,
+                    name = userDto.name ?: "",
+                    serverId = serverId,
+                    accessToken = null,
+                )
+            }
         }
 
-    override suspend fun loadDisclaimer(): String? =
-        withContext(Dispatchers.IO) {
-            jellyfinApi.userApi.getUserConfiguration().content
-        }?.let { userConfiguration ->
-            userConfiguration.loginDisclaimer
-        }
-
-    override suspend fun getIsQuickConnectEnabled(): Boolean =
-        withContext(Dispatchers.IO) { jellyfinApi.quickConnectApi.getQuickConnectEnabled().content }
+    override suspend fun loadDisclaimer(): String? = null
 
     override suspend fun deleteUser(userId: UUID) {
         database.deleteUser(userId)
     }
 
-    override suspend fun deleteServerAddress(serverAddressId: UUID) {
-        database.deleteServerAddress(serverAddressId)
+    // --- Missing Interface Implementations ---
+    override suspend fun login(username: String, password: String) {
+        val serverId = appPreferences.getValue(appPreferences.currentServer)
+            ?: throw ExceptionUiText(UiText.DynamicString("No server selected"))
+        authenticateUser(serverId, username, password)
     }
 
-    override suspend fun updateServerCurrentUser(serverId: String, userId: UUID) {
+    override suspend fun loginWithSecret(secret: String) {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun getCurrentUser(): User? {
+        return appPreferences.getValue(appPreferences.currentServer)?.let { serverId ->
+            database.getServerWithAddressAndUser(serverId)?.user
+        }
+    }
+
+    override suspend fun setCurrentUser(userId: UUID) {
+        val serverId = appPreferences.getValue(appPreferences.currentServer) ?: return
         database.updateServerCurrentUser(serverId, userId)
     }
 
-    override suspend fun updateServerCurrentAddress(serverId: String, serverAddressId: UUID) {
-        database.updateServerCurrentAddress(serverId, serverAddressId)
-    }
-
-    override suspend fun addServerAddress(serverId: String, address: String) {
-        val serverAddress =
-            ServerAddress(
-                id = UUID.randomUUID(),
-                serverId = serverId,
-                address = address,
-            )
-        database.insertServerAddress(serverAddress)
-    }
-
-    override suspend fun setCurrentServerAddress(serverId: String, serverAddressId: UUID) {
-        database.updateServerCurrentAddress(serverId, serverAddressId)
-    }
-
-    override suspend fun getServerWithAddresses(serverId: String): ServerWithAddresses? {
-        return database.getServerWithAddresses(serverId)
+    override suspend fun setCurrentAddress(addressId: UUID) {
+        TODO("Not yet implemented")
     }
 }

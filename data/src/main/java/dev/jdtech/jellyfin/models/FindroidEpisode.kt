@@ -73,9 +73,11 @@ suspend fun BaseItemDto.toFindroidEpisode(
             images = toFindroidImages(jellyfinRepository),
             chapters = toFindroidChapters(),
             trickplayInfo =
-                trickplay?.mapValues { (key, value) -> 
-                    value[value.keys.maxOrNull()]?.toFindroidTrickplayInfo() 
-                }?.filterNotNull(),
+                trickplay
+                    ?.mapNotNull { (key, value) ->
+                        value[value.keys.maxOrNull()]?.toFindroidTrickplayInfo()?.let { key to it }
+                    }
+                    ?.toMap(),
         )
     } catch (_: NullPointerException) {
         null

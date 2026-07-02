@@ -268,7 +268,7 @@ class PlayerActivity : BasePlayerActivity() {
 
                 if (
                     appPreferences.getValue(appPreferences.playerMediaSegmentsSkipButton) ||
-                        appPreferences.getValue(appPreferences.playerMediaSegmentsAutoSkip)
+                    appPreferences.getValue(appPreferences.playerMediaSegmentsAutoSkip)
                 ) {
                     launch {
                         while (true) {
@@ -348,7 +348,7 @@ class PlayerActivity : BasePlayerActivity() {
 
         viewModel.initializePlayer(
             itemId = itemId,
-            itemKind = itemKind ?: "",
+            itemKind = itemKind,
             startFromBeginning = startFromBeginning,
         )
         hideSystemUI()
@@ -373,9 +373,9 @@ class PlayerActivity : BasePlayerActivity() {
         super.onUserLeaveHint()
         if (
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S &&
-                appPreferences.getValue(appPreferences.playerPipGesture) &&
-                viewModel.player.isPlaying &&
-                !isControlsLocked
+            appPreferences.getValue(appPreferences.playerPipGesture) &&
+            viewModel.player.isPlaying &&
+            !isControlsLocked
         ) {
             pictureInPicture()
         }
@@ -481,7 +481,7 @@ class PlayerActivity : BasePlayerActivity() {
                 // Override auto brightness
                 if (
                     appPreferences.getValue(appPreferences.playerGesturesVB) &&
-                        appPreferences.getValue(appPreferences.playerGesturesBrightnessRemember)
+                    appPreferences.getValue(appPreferences.playerGesturesBrightnessRemember)
                 ) {
                     window.attributes =
                         window.attributes.apply {
