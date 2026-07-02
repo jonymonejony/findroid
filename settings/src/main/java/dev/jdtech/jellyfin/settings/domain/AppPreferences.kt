@@ -25,7 +25,7 @@ class AppPreferences @Inject constructor(val sharedPreferences: SharedPreference
     // Player
     val playerBackend = Preference("pref_player_backend", "exoplayer")
     val playerBrightness = Preference("pref_player_brightness", -1.0f)
-    val playerCacheSize = Preference("pref_player_cache_size", 512)
+    val playerCacheSize = Preference<String?>("pref_player_cache_size", "536870912")
 
     // Player - mpv
     val playerMpvHwdec = Preference("pref_player_mpv_hwdec", "mediacodec")

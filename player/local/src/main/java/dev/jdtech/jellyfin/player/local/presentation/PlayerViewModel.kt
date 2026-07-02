@@ -177,7 +177,7 @@ constructor(
                     .setAudioOutput(appPreferences.getValue(appPreferences.playerMpvAo))
                     .setHwDec(appPreferences.getValue(appPreferences.playerMpvHwdec))
                     .setGpuApi(appPreferences.getValue(appPreferences.playerMpvGpuApi))
-                    .setCacheSizeMB(appPreferences.getValue(appPreferences.playerCacheSize))
+                    .setCacheSizeBytes(appPreferences.getValue(appPreferences.playerCacheSize))
                     .build()
             }
 

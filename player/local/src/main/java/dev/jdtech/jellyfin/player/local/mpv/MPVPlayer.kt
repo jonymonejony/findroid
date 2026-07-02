@@ -57,7 +57,7 @@ class MPVPlayer(
     audioOutput: String = "aaudio",
     hwDec: String = "mediacodec",
     gpuApi: String = "auto",
-    cacheSizeMB: Int = 512,
+    cacheSizeBytes: String? = "536870912"
 ) : BasePlayer(), MPVLib.EventObserver, AudioManager.OnAudioFocusChangeListener {
     private val mpvLib: MPVLib
     private val audioManager: AudioManager by lazy { context.getSystemService()!! }
@@ -79,7 +79,7 @@ class MPVPlayer(
         audioOutput = builder.audioOutput,
         hwDec = builder.hwDec,
         gpuApi = builder.gpuApi,
-        cacheSizeMB = builder.cacheSizeMB,
+        cacheSizeBytes = builder.cacheSizeBytes,
     )
 
     class Builder(val context: Context) {
@@ -113,7 +113,7 @@ class MPVPlayer(
         var gpuApi: String = "auto"
             private set
 
-        var cacheSizeMB: Int = 512
+        var cacheSizeBytes: String? = "536870912"
             private set
 
         fun setAudioAttributes(audioAttributes: AudioAttributes, handleAudioFocus: Boolean) =
@@ -147,7 +147,7 @@ class MPVPlayer(
 
         fun setGpuApi(gpuApi: String) = apply { this.gpuApi = gpuApi }
 
-        fun setCacheSizeMB(cacheSizeMB: Int) = apply { this.cacheSizeMB = cacheSizeMB }
+        fun setCacheSizeBytes(cacheSizeBytes: String?) = apply { this.cacheSizeBytes = cacheSizeBytes }
 
         fun build() = MPVPlayer(this)
     }
@@ -170,7 +170,7 @@ class MPVPlayer(
         mpvLib.setOptionString("ao", audioOutput)
         mpvLib.setOptionString("gpu-context", "android")
         mpvLib.setOptionString("opengl-es", "yes")
-        
+
         // GPU API
         if (gpuApi != "auto") {
             mpvLib.setOptionString("gpu-api", gpuApi)
@@ -186,9 +186,9 @@ class MPVPlayer(
         // Cache
         mpvLib.setOptionString("cache", "yes")
         mpvLib.setOptionString("cache-pause-initial", "yes")
-        val cacheBytes = cacheSizeMB * 1024 * 1024
-        mpvLib.setOptionString("demuxer-max-bytes", "${cacheBytes}")
-        mpvLib.setOptionString("demuxer-max-back-bytes", "${cacheBytes / 2}")
+        val parsedCacheBytes = cacheSizeBytes?.toLongOrNull() ?: 536870912L
+        mpvLib.setOptionString("demuxer-max-bytes", "$parsedCacheBytes")
+        mpvLib.setOptionString("demuxer-max-back-bytes", "${parsedCacheBytes / 2}")
 
         // Subs
         mpvLib.setOptionString("sub-scale-with-window", "yes")
@@ -220,17 +220,17 @@ class MPVPlayer(
         // Observe properties
         data class Property(val name: String, val format: Int)
         arrayOf(
-                Property("track-list", MpvFormat.MPV_FORMAT_STRING),
-                Property("paused-for-cache", MpvFormat.MPV_FORMAT_FLAG),
-                Property("eof-reached", MpvFormat.MPV_FORMAT_FLAG),
-                Property("seekable", MpvFormat.MPV_FORMAT_FLAG),
-                Property("time-pos", MpvFormat.MPV_FORMAT_INT64),
-                Property("duration", MpvFormat.MPV_FORMAT_INT64),
-                Property("demuxer-cache-time", MpvFormat.MPV_FORMAT_INT64),
-                Property("speed", MpvFormat.MPV_FORMAT_DOUBLE),
-                Property("playlist-count", MpvFormat.MPV_FORMAT_INT64),
-                Property("playlist-current-pos", MpvFormat.MPV_FORMAT_INT64),
-            )
+            Property("track-list", MpvFormat.MPV_FORMAT_STRING),
+            Property("paused-for-cache", MpvFormat.MPV_FORMAT_FLAG),
+            Property("eof-reached", MpvFormat.MPV_FORMAT_FLAG),
+            Property("seekable", MpvFormat.MPV_FORMAT_FLAG),
+            Property("time-pos", MpvFormat.MPV_FORMAT_INT64),
+            Property("duration", MpvFormat.MPV_FORMAT_INT64),
+            Property("demuxer-cache-time", MpvFormat.MPV_FORMAT_INT64),
+            Property("speed", MpvFormat.MPV_FORMAT_DOUBLE),
+            Property("playlist-count", MpvFormat.MPV_FORMAT_INT64),
+            Property("playlist-current-pos", MpvFormat.MPV_FORMAT_INT64),
+        )
             .forEach { (name, format) -> mpvLib.observeProperty(name, format) }
 
         val audioSessionId = audioManager.generateAudioSessionId()
@@ -553,7 +553,7 @@ class MPVPlayer(
              * @param windowIndex The index of the window.
              * @param window The [Timeline.Window] to populate. Must not be null.
              * @param defaultPositionProjectionUs A duration into the future that the populated
-             *   window's default start position should be projected.
+             * window's default start position should be projected.
              * @return The populated [Timeline.Window], for convenience.
              */
             override fun getWindow(
@@ -592,8 +592,8 @@ class MPVPlayer(
              * @param periodIndex The index of the period.
              * @param period The [Timeline.Period] to populate. Must not be null.
              * @param setIds Whether [Timeline.Period.id] and [Timeline.Period.uid] should be
-             *   populated. If false, the fields will be set to null. The caller should pass false
-             *   for efficiency reasons unless the fields are required.
+             * populated. If false, the fields will be set to null. The caller should pass false
+             * for efficiency reasons unless the fields are required.
              * @return The populated [Timeline.Period], for convenience.
              */
             override fun getPeriod(periodIndex: Int, period: Period, setIds: Boolean): Period {
@@ -639,8 +639,8 @@ class MPVPlayer(
      * the volume of its music stream (duck) for transient focus losses, and pause otherwise.
      *
      * @param focusChange the type of focus change, one of [AudioManager.AUDIOFOCUS_GAIN],
-     *   [AudioManager.AUDIOFOCUS_LOSS], [AudioManager.AUDIOFOCUS_LOSS_TRANSIENT] and
-     *   [AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK].
+     * [AudioManager.AUDIOFOCUS_LOSS], [AudioManager.AUDIOFOCUS_LOSS_TRANSIENT] and
+     * [AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK].
      */
     override fun onAudioFocusChange(focusChange: Int) {
         when (focusChange) {
@@ -707,8 +707,8 @@ class MPVPlayer(
      *
      * @param mediaItems The new [MediaItems][MediaItem].
      * @param resetPosition Whether the playback position should be reset to the default position in
-     *   the first [Timeline.Window]. If false, playback will start from the position defined by
-     *   [.getCurrentWindowIndex] and [.getCurrentPosition].
+     * the first [Timeline.Window]. If false, playback will start from the position defined by
+     * [.getCurrentWindowIndex] and [.getCurrentPosition].
      */
     override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {
         mpvLib.command(arrayOf("playlist-clear"))
@@ -721,13 +721,13 @@ class MPVPlayer(
      *
      * @param mediaItems The new [MediaItems][MediaItem].
      * @param startWindowIndex The window index to start playback from. If [C.INDEX_UNSET] is
-     *   passed, the current position is not reset.
+     * passed, the current position is not reset.
      * @param startPositionMs The position in milliseconds to start playback from. If
-     *   [ ][C.TIME_UNSET] is passed, the default position of the given window is used. In any case,
-     *   if `startWindowIndex` is set to [C.INDEX_UNSET], this parameter is ignored and the position
-     *   is not reset at all.
+     * [ ][C.TIME_UNSET] is passed, the default position of the given window is used. In any case,
+     * if `startWindowIndex` is set to [C.INDEX_UNSET], this parameter is ignored and the position
+     * is not reset at all.
      * @throws androidx.media3.common.IllegalSeekPositionException If the provided
-     *   `startWindowIndex` is not within the bounds of the list of media items.
+     * `startWindowIndex` is not within the bounds of the list of media items.
      */
     override fun setMediaItems(
         mediaItems: MutableList<MediaItem>,
@@ -745,7 +745,7 @@ class MPVPlayer(
      * Adds a list of media items at the given index of the playlist.
      *
      * @param index The index at which to add the media items. If the index is larger than the size
-     *   of the playlist, the media items are added to the end of the playlist.
+     * of the playlist, the media items are added to the end of the playlist.
      * @param mediaItems The [MediaItems][MediaItem] to add.
      */
     override fun addMediaItems(index: Int, mediaItems: MutableList<MediaItem>) {
@@ -768,8 +768,8 @@ class MPVPlayer(
      * @param fromIndex The start of the range to move.
      * @param toIndex The first item not to be included in the range (exclusive).
      * @param newIndex The new index of the first media item of the range. If the new index is
-     *   larger than the size of the remaining playlist after removing the range, the range is moved
-     *   to the end of the playlist.
+     * larger than the size of the remaining playlist after removing the range, the range is moved
+     * to the end of the playlist.
      */
     override fun moveMediaItems(fromIndex: Int, toIndex: Int, newIndex: Int) {
         TODO("Not yet implemented")
@@ -788,7 +788,7 @@ class MPVPlayer(
      *
      * @param fromIndex The index at which to start removing media items.
      * @param toIndex The index of the first item to be kept (exclusive). If the index is larger
-     *   than the size of the playlist, media items to the end of the playlist are removed.
+     * than the size of the playlist, media items to the end of the playlist are removed.
      */
     override fun removeMediaItems(fromIndex: Int, toIndex: Int) {
         TODO("Not yet implemented")
@@ -820,17 +820,17 @@ class MPVPlayer(
             .addIf(
                 COMMAND_SEEK_TO_PREVIOUS,
                 !currentTimeline.isEmpty &&
-                    (hasPreviousMediaItem() ||
-                        !isCurrentMediaItemLive ||
-                        isCurrentMediaItemSeekable) &&
-                    !isPlayingAd,
+                        (hasPreviousMediaItem() ||
+                                !isCurrentMediaItemLive ||
+                                isCurrentMediaItemSeekable) &&
+                        !isPlayingAd,
             )
             .addIf(COMMAND_SEEK_TO_NEXT_MEDIA_ITEM, hasNextMediaItem() && !isPlayingAd)
             .addIf(
                 COMMAND_SEEK_TO_NEXT,
                 !currentTimeline.isEmpty &&
-                    (hasNextMediaItem() || (isCurrentMediaItemLive && isCurrentMediaItemDynamic)) &&
-                    !isPlayingAd,
+                        (hasNextMediaItem() || (isCurrentMediaItemLive && isCurrentMediaItemDynamic)) &&
+                        !isPlayingAd,
             )
             .addIf(COMMAND_SEEK_TO_MEDIA_ITEM, !isPlayingAd)
             .addIf(COMMAND_SEEK_BACK, isCurrentMediaItemSeekable && !isPlayingAd)
@@ -1004,11 +1004,11 @@ class MPVPlayer(
      *
      * @param mediaItemIndex The index of the window.
      * @param positionMs The seek position in the specified window, or [C.TIME_UNSET] to seek to the
-     *   window's default position.
+     * window's default position.
      * @param seekCommand The {@link Player.Command} used to trigger the seek.
      * @param isRepeatingCurrentItem Whether this seeks repeats the current item.
      * @throws androidx.media3.common.IllegalSeekPositionException If the player has a non-empty
-     *   timeline and the provided `windowIndex` is not within the bounds of the current timeline.
+     * timeline and the provided `windowIndex` is not within the bounds of the current timeline.
      */
     override fun seekTo(
         mediaItemIndex: Int,
