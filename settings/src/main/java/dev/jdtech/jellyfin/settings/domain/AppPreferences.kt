@@ -25,11 +25,13 @@ class AppPreferences @Inject constructor(val sharedPreferences: SharedPreference
     // Player
     val playerBackend = Preference("pref_player_backend", "exoplayer")
     val playerBrightness = Preference("pref_player_brightness", -1.0f)
+    val playerCacheSize = Preference("pref_player_cache_size", 512)
 
     // Player - mpv
     val playerMpvHwdec = Preference("pref_player_mpv_hwdec", "mediacodec")
     val playerMpvVo = Preference("pref_player_mpv_vo", "gpu-next")
     val playerMpvAo = Preference("pref_player_mpv_ao", "aaudio")
+    val playerMpvGpuApi = Preference("pref_player_mpv_gpu_api", "auto")
 
     // Player - gestures
     val playerGestures = Preference("pref_player_gestures", true)

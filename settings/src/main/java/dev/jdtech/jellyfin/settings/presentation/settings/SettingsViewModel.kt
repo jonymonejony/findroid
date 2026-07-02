@@ -251,6 +251,13 @@ class SettingsViewModel @Inject constructor(private val appPreferences: AppPrefe
                                                     options = R.array.player_backends,
                                                     optionValues = R.array.player_backends
                                                 ),
+                                                PreferenceSelect(
+                                                    nameStringResource = R.string.pref_player_cache_size,
+                                                    descriptionStringRes = R.string.pref_player_cache_size_summary,
+                                                    backendPreference = appPreferences.playerCacheSize,
+                                                    options = R.array.player_cache_sizes,
+                                                    optionValues = R.array.player_cache_sizes_values
+                                                ),
 
                                             )
                                     ),
@@ -294,6 +301,13 @@ class SettingsViewModel @Inject constructor(private val appPreferences: AppPrefe
                                                                             backendPreference = appPreferences.playerMpvAo,
                                                                             options = R.array.mpv_aos,
                                                                             optionValues = R.array.mpv_aos,
+                                                                        ),
+                                                                        PreferenceSelect(
+                                                                            nameStringResource =
+                                                                                R.string.pref_player_mpv_gpu_api,
+                                                                            backendPreference = appPreferences.playerMpvGpuApi,
+                                                                            options = R.array.mpv_gpu_apis,
+                                                                            optionValues = R.array.mpv_gpu_apis,
                                                                         ),
                                                                     ),
                                                             ),

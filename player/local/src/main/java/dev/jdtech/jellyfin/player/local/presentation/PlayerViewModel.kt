@@ -13,6 +13,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
@@ -139,6 +140,15 @@ constructor(
                 val renderersFactory =
                     DefaultRenderersFactory(application)
                         .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+                val loadControl =
+                    DefaultLoadControl.Builder()
+                        .setBufferDurationsMs(
+                            DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                            DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
+                            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
+                        )
+                        .build()
                 ExoPlayer.Builder(application, renderersFactory)
                     .setAudioAttributes(audioAttributes, true)
                     .setTrackSelector(trackSelector)
@@ -149,6 +159,7 @@ constructor(
                         appPreferences.getValue(appPreferences.playerSeekForwardInc)
                     )
                     .setPauseAtEndOfMediaItems(true)
+                    .setLoadControl(loadControl)
                     .build()
             }
             "mpv" -> {
@@ -165,6 +176,8 @@ constructor(
                     .setVideoOutput(appPreferences.getValue(appPreferences.playerMpvVo))
                     .setAudioOutput(appPreferences.getValue(appPreferences.playerMpvAo))
                     .setHwDec(appPreferences.getValue(appPreferences.playerMpvHwdec))
+                    .setGpuApi(appPreferences.getValue(appPreferences.playerMpvGpuApi))
+                    .setCacheSizeMB(appPreferences.getValue(appPreferences.playerCacheSize))
                     .build()
             }
 
