@@ -65,7 +65,7 @@ constructor(private val repository: SetupRepository, private val appPreferences:
                         isLoading = false,
                         error =
                             listOf(
-                                if (e.message != null) UiText.DynamicString(e.message!!)
+                                if (e.message != null) UiText.DynamicString(e.message)
                                 else UiText.StringResource(CoreR.string.unknown_error)
                             ),
                     )

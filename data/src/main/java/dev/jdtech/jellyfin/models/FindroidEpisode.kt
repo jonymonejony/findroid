@@ -63,9 +63,9 @@ suspend fun BaseItemDto.toFindroidEpisode(
             runtimeTicks = runTimeTicks ?: 0,
             playbackPositionTicks = userData?.playbackPositionTicks ?: 0L,
             premiereDate = premiereDate,
-            seriesId = seriesId!!,
+            seriesId = seriesId ?: UUID.randomUUID(),
             seriesName = seriesName.orEmpty(),
-            seasonId = seasonId!!,
+            seasonId = seasonId ?: UUID.randomUUID(),
             seasonName = seasonName,
             communityRating = communityRating,
             people = people?.map { it.toFindroidPerson(jellyfinRepository) } ?: emptyList(),
@@ -73,7 +73,7 @@ suspend fun BaseItemDto.toFindroidEpisode(
             images = toFindroidImages(jellyfinRepository),
             chapters = toFindroidChapters(),
             trickplayInfo =
-                trickplay?.mapValues { it.value[it.value.keys.max()]!!.toFindroidTrickplayInfo() },
+                trickplay?.mapValues { it.value[it.value.keys.max()]?.toFindroidTrickplayInfo() }?.filterValues { it != null },
         )
     } catch (_: NullPointerException) {
         null

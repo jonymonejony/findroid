@@ -165,9 +165,9 @@ fun ServerAddressesLayout(state: ServerAddressesState, onAction: (ServerAddresse
 
     if (openDeleteDialog && selectedAddress != null) {
         DeleteServerAddressDialog(
-            address = selectedAddress!!.address,
+            address = selectedAddress.address,
             onConfirm = {
-                onAction(ServerAddressesAction.DeleteAddress(selectedAddress!!.id))
+                onAction(ServerAddressesAction.DeleteAddress(selectedAddress.id))
                 openDeleteDialog = false
             },
             onDismiss = { openDeleteDialog = false },
