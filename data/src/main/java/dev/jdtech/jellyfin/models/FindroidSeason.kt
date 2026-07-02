@@ -41,7 +41,7 @@ fun BaseItemDto.toFindroidSeason(jellyfinRepository: JellyfinRepository): Findro
         indexNumber = indexNumber ?: 0,
         sources = emptyList(),
         episodes = emptyList(),
-        seriesId = seriesId!!,
+        seriesId = seriesId ?: UUID.randomUUID(),
         seriesName = seriesName.orEmpty(),
         images = toFindroidImages(jellyfinRepository),
     )

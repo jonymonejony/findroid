@@ -51,7 +51,7 @@ fun FindroidSourceDto.toFindroidSource(serverDatabaseDao: ServerDatabaseDao): Fi
         name = name,
         type = type,
         path = path,
-        size = File(path).length(),
+        size = if (File(path).exists()) File(path).length() else 0L,
         mediaStreams =
             serverDatabaseDao.getMediaStreamsBySourceId(id).map { it.toFindroidMediaStream() },
         downloadId = downloadId,

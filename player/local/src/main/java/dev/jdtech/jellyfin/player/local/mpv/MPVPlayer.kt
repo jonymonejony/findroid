@@ -202,7 +202,7 @@ class MPVPlayer(
             mpvLib.setOptionString("alang", it.split("-").last())
         }
         trackSelectionParameters.preferredTextLanguages.firstOrNull()?.let {
-            println(it.split("-").last())
+            Timber.d("Preferred subtitle language: ${it.split("-").last()}")
             mpvLib.setOptionString("slang", it.split("-").last())
         }
 
@@ -455,13 +455,18 @@ class MPVPlayer(
         handler.post {
             when (eventId) {
                 MpvEvent.MPV_EVENT_START_FILE -> {
+                    Timber.d("MPV_EVENT_START_FILE - Starting to load file")
                     if (!isPlayerReady) {
                         for (command in initialCommands) {
                             mpvLib.command(command)
                         }
                     }
                 }
+                MpvEvent.MPV_EVENT_END_FILE -> {
+                    Timber.e("MPV_EVENT_END_FILE - File playback ended unexpectedly")
+                }
                 MpvEvent.MPV_EVENT_FILE_LOADED -> {
+                    Timber.d("MPV_EVENT_FILE_LOADED - File loaded successfully")
                     isSeekable = mpvLib.getPropertyBoolean("seekable") == true
                     currentDurationMs =
                         (mpvLib.getPropertyDouble("duration")?.times(C.MILLIS_PER_SECOND))?.toLong()
