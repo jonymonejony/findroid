@@ -156,7 +156,7 @@ class DownloaderImpl(
             Timber.e(e)
             return@coroutineScope Pair(
                 -1,
-                if (e.message != null) UiText.DynamicString(e.message!!)
+                if (e.message != null) UiText.DynamicString(e.message)
                 else UiText.StringResource(CoreR.string.unknown_error),
             )
         }
@@ -166,7 +166,7 @@ class DownloaderImpl(
         val source =
             database.getSourceByDownloadId(downloadId)?.toFindroidSource(database) ?: return
         if (source.downloadId != null) {
-            downloadManager.remove(source.downloadId!!)
+            source.downloadId?.let { downloadManager.remove(it) }
         }
         deleteItem(item, source)
     }
@@ -263,7 +263,7 @@ class DownloaderImpl(
                 mediaStream.toFindroidMediaStreamDto(id, source.id, streamPath.path.orEmpty())
             )
             val request =
-                DownloadManager.Request(mediaStream.path!!.toUri())
+                mediaStream.path?.let { DownloadManager.Request(it.toUri()) }
                     .setTitle(mediaStream.title)
                     .setAllowedOverMetered(
                         appPreferences.getValue(appPreferences.downloadOverMobileData)

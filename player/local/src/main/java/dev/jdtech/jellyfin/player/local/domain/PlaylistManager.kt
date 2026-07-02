@@ -209,9 +209,11 @@ class PlaylistManager @Inject internal constructor(private val repository: Jelly
         val mediaSources = repository.getMediaSources(id, true)
         val mediaSource =
             if (mediaSourceIndex == null) {
-                mediaSources.firstOrNull { it.type == FindroidSourceType.LOCAL } ?: mediaSources[0]
+                mediaSources.firstOrNull { it.type == FindroidSourceType.LOCAL } ?: mediaSources.getOrNull(0)
+                    ?: throw IllegalStateException("No media sources available for item ${this.id}")
             } else {
-                mediaSources[mediaSourceIndex]
+                mediaSources.getOrNull(mediaSourceIndex)
+                    ?: throw IllegalStateException("Media source index $mediaSourceIndex not found for item ${this.id}")
             }
         val externalSubtitles =
             mediaSource.mediaStreams
@@ -221,14 +223,33 @@ class PlaylistManager @Inject internal constructor(private val repository: Jelly
                         !mediaStream.path.isNullOrBlank()
                 }
                 .map { mediaStream ->
+                    // Format subtitle title to show language and format (e.g., "English - SubRip" or "Japanese - PGS")
+                    val language = mediaStream.language.ifBlank { "Unknown" }
+                    val format = when (mediaStream.codec.lowercase()) {
+                        "subrip", "srt" -> "SubRip"
+                        "webvtt", "vtt" -> "WebVTT"
+                        "ass", "ssa" -> "ASS"
+                        "pgssub", "pgs" -> "PGS (Picture)"
+                        "utf-8" -> "UTF-8"
+                        else -> mediaStream.codec.ifBlank { "Unknown" }
+                    }
+                    val displayTitle = if (language != "Unknown" && format != "Unknown") {
+                        "$language - $format"
+                    } else if (language != "Unknown") {
+                        language
+                    } else {
+                        format
+                    }
+                    
                     ExternalSubtitle(
-                        mediaStream.title,
-                        mediaStream.language,
-                        mediaStream.path!!.toUri(),
-                        when (mediaStream.codec) {
-                            "subrip" -> MimeTypes.APPLICATION_SUBRIP
-                            "webvtt" -> MimeTypes.APPLICATION_SUBRIP
-                            "ass" -> MimeTypes.TEXT_SSA
+                        title = displayTitle,
+                        language = mediaStream.language,
+                        uri = mediaStream.path!!.toUri(),
+                        mimeType = when (mediaStream.codec.lowercase()) {
+                            "subrip", "srt" -> MimeTypes.APPLICATION_SUBRIP
+                            "webvtt", "vtt" -> MimeTypes.APPLICATION_SUBRIP
+                            "ass", "ssa" -> MimeTypes.TEXT_SSA
+                            "pgssub", "pgs" -> MimeTypes.APPLICATION_SUBRIP // PGS uses same MIME type as SRT
                             else -> MimeTypes.TEXT_UNKNOWN
                         },
                     )

@@ -4,7 +4,6 @@ import dev.jdtech.jellyfin.api.JellyfinApi
 import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.models.ExceptionUiText
-import dev.jdtech.jellyfin.models.ExceptionUiTexts
 import dev.jdtech.jellyfin.models.Server
 import dev.jdtech.jellyfin.models.ServerAddress
 import dev.jdtech.jellyfin.models.ServerWithAddresses
@@ -198,57 +197,77 @@ class SetupRepositoryImpl(
                     UiText.StringResource(SetupR.string.add_server_error_version, it.version)
                 }
                 is RecommendedServerIssue.SlowResponse -> {
-                    UiText.StringResource(SetupR.string.add_server_error_slow, it.responseTime)
+                    UiText.StringResource(SetupR.string.add_server_error_slow_response)
                 }
-                else -> {
-                    UiText.StringResource(CoreR.string.unknown_error)
+                is RecommendedServerIssue.Unreachable -> {
+                    UiText.StringResource(SetupR.string.add_server_error_unreachable)
                 }
             }
         }
     }
 
-    override suspend fun loadDisclaimer(): String? =
-        withContext(Dispatchers.IO) {
-            jellyfinApi.brandingApi.getBrandingOptions().content.loginDisclaimer
+    override suspend fun authenticateUser(
+        serverId: String,
+        username: String,
+        password: String,
+    ): User {
+        val serverWithAddressAndUser = database.getServerWithAddressAndUser(serverId) ?: throw ExceptionUiText(
+            UiText.StringResource(SetupR.string.add_server_error_not_found)
+        )
+        val serverAddress = serverWithAddressAndUser.address ?: throw ExceptionUiText(
+            UiText.StringResource(SetupR.string.add_server_error_no_address)
+        )
+
+        jellyfinApi.apply {
+            api.update(baseUrl = serverAddress.address, accessToken = null)
         }
 
-    override suspend fun login(username: String, password: String) {
-        withContext(Dispatchers.IO) {
-            val authenticationResult by
+        val authenticationResult =
+            withContext(Dispatchers.IO) {
                 jellyfinApi.userApi.authenticateUserByName(
-                    data = AuthenticateUserByName(username = username, pw = password)
-                )
+                    authenticateUserByName =
+                        AuthenticateUserByName(
+                            username = username,
+                            password = password,
+                        ),
+                ).content
+            }
 
-            saveAuthenticationResult(authenticationResult)
-        }
-    }
+        saveAuthenticationResult(authenticationResult)
 
-    override suspend fun loginWithSecret(secret: String) {
-        withContext(Dispatchers.IO) {
-            val authenticationResult by
-                jellyfinApi.userApi.authenticateWithQuickConnect(
-                    data = QuickConnectDto(secret = secret)
-                )
-
-            saveAuthenticationResult(authenticationResult)
-        }
+        return database.getUser(authenticationResult.user?.id ?: throw ExceptionUiText(
+            UiText.StringResource(SetupR.string.login_error_no_user)
+        )) ?: throw ExceptionUiText(
+            UiText.StringResource(SetupR.string.login_error_not_found)
+        )
     }
 
     private fun saveAuthenticationResult(authenticationResult: AuthenticationResult) {
+        val userId = authenticationResult.user?.id ?: throw ExceptionUiText(
+            UiText.StringResource(SetupR.string.login_error_no_user)
+        )
+        val userName = authenticationResult.user?.name ?: ""
+        val serverId = authenticationResult.serverId ?: throw ExceptionUiText(
+            UiText.StringResource(SetupR.string.login_error_no_server)
+        )
+        val accessToken = authenticationResult.accessToken ?: throw ExceptionUiText(
+            UiText.StringResource(SetupR.string.login_error_no_token)
+        )
+
         val user =
             User(
-                id = authenticationResult.user!!.id,
-                name = authenticationResult.user!!.name!!,
-                serverId = authenticationResult.serverId!!,
-                accessToken = authenticationResult.accessToken!!,
+                id = userId,
+                name = userName,
+                serverId = serverId,
+                accessToken = accessToken,
             )
 
         database.insertUser(user)
-        database.updateServerCurrentUser(authenticationResult.serverId!!, user.id)
+        database.updateServerCurrentUser(serverId, user.id)
 
         jellyfinApi.apply {
-            api.update(accessToken = authenticationResult.accessToken)
-            userId = authenticationResult.user?.id
+            api.update(accessToken = accessToken)
+            userId = user.id
         }
     }
 
@@ -258,46 +277,50 @@ class SetupRepositoryImpl(
 
     override suspend fun getPublicUsers(serverId: String): List<User> =
         withContext(Dispatchers.IO) {
-            jellyfinApi.userApi.getPublicUsers().content.mapNotNull {
-                User(id = it.id, name = it.name ?: return@mapNotNull null, serverId = serverId)
-            }
+            jellyfinApi.userApi.getPublicUsers(serverId).content
         }
 
-    override suspend fun getCurrentUser(): User? {
-        val currentServer = getCurrentServer() ?: return null
-        return database.getServerCurrentUser(currentServer.id)
-    }
+    override suspend fun loadDisclaimer(): String? =
+        withContext(Dispatchers.IO) {
+            jellyfinApi.userApi.getUserConfiguration().content
+        }?.let { userConfiguration ->
+            userConfiguration.loginDisclaimer
+        }
+
+    override suspend fun getIsQuickConnectEnabled(): Boolean =
+        withContext(Dispatchers.IO) { jellyfinApi.quickConnectApi.getQuickConnectEnabled().content }
 
     override suspend fun deleteUser(userId: UUID) {
-        // Let the user delete the current active user for now
-        /*val currentUser = getCurrentUser() ?: return
-        if (userId == currentUser.id) {
-            Timber.e("You cannot delete the current user")
-            return
-        }*/
         database.deleteUser(userId)
     }
 
-    override suspend fun setCurrentUser(userId: UUID) {
-        val server = getCurrentServer() ?: return
-        val user = database.getUser(userId) ?: return
-        server.currentUserId = user.id
-        database.update(server)
-
-        jellyfinApi.apply {
-            api.update(accessToken = user.accessToken)
-            this.userId = user.id
-        }
+    override suspend fun deleteServerAddress(serverAddressId: UUID) {
+        database.deleteServerAddress(serverAddressId)
     }
 
-    override suspend fun setCurrentAddress(addressId: UUID) {
-        val server = getCurrentServer() ?: return
-        val address = database.getAddress(id = addressId)
-        if (address.serverId != server.id) {
-            return
-        }
-        server.currentServerAddressId = address.id
-        database.update(server)
-        jellyfinApi.apply { api.update(baseUrl = address.address) }
+    override suspend fun updateServerCurrentUser(serverId: String, userId: UUID) {
+        database.updateServerCurrentUser(serverId, userId)
+    }
+
+    override suspend fun updateServerCurrentAddress(serverId: String, serverAddressId: UUID) {
+        database.updateServerCurrentAddress(serverId, serverAddressId)
+    }
+
+    override suspend fun addServerAddress(serverId: String, address: String) {
+        val serverAddress =
+            ServerAddress(
+                id = UUID.randomUUID(),
+                serverId = serverId,
+                address = address,
+            )
+        database.insertServerAddress(serverAddress)
+    }
+
+    override suspend fun setCurrentServerAddress(serverId: String, serverAddressId: UUID) {
+        database.updateServerCurrentAddress(serverId, serverAddressId)
+    }
+
+    override suspend fun getServerWithAddresses(serverId: String): ServerWithAddresses? {
+        return database.getServerWithAddresses(serverId)
     }
 }

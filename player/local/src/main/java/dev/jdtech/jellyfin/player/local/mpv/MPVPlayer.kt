@@ -333,6 +333,7 @@ class MPVPlayer(
     private var initialIndex: Int = 0
     private var initialSeekTo: Long = 0L
     private var oldMediaItem: MediaItem? = null
+    private var playerError: PlaybackException? = null
 
     // mpv events
     override fun eventProperty(property: String) {
@@ -456,6 +457,8 @@ class MPVPlayer(
             when (eventId) {
                 MpvEvent.MPV_EVENT_START_FILE -> {
                     Timber.d("MPV_EVENT_START_FILE - Starting to load file")
+                    // Clear any previous errors when starting new playback
+                    playerError = null
                     if (!isPlayerReady) {
                         for (command in initialCommands) {
                             mpvLib.command(command)
@@ -463,7 +466,33 @@ class MPVPlayer(
                     }
                 }
                 MpvEvent.MPV_EVENT_END_FILE -> {
-                    Timber.e("MPV_EVENT_END_FILE - File playback ended unexpectedly")
+                    Timber.e("MPV_EVENT_END_FILE - File playback ended")
+                    // Check if this is an error or normal end of file
+                    // In MPV, we need to check the end-file reason
+                    // For now, treat all END_FILE events as potential errors if player is ready
+                    if (isPlayerReady) {
+                        // Try to get the error reason from MPV
+                        val endFileReason = mpvLib.getPropertyInt("end-file")
+                        if (endFileReason != null && endFileReason != 0) {
+                            // This is an error
+                            playerError = PlaybackException(
+                                "Playback failed with error code: $endFileReason",
+                                null
+                            )
+                            setPlayerStateAndNotifyIfChanged(playbackState = STATE_ERROR)
+                            listeners.sendEvent(EVENT_PLAYER_ERROR) { listener ->
+                                listener.onPlayerError(playerError!!)
+                            }
+                        } else {
+                            // Normal end of file
+                            if (currentMediaItemIndex < (internalMediaItems.size - 1)) {
+                                prepareMediaItem(currentMediaItemIndex + 1)
+                                play()
+                            } else {
+                                setPlayerStateAndNotifyIfChanged(playbackState = STATE_ENDED)
+                            }
+                        }
+                    }
                 }
                 MpvEvent.MPV_EVENT_FILE_LOADED -> {
                     Timber.d("MPV_EVENT_FILE_LOADED - File loaded successfully")
@@ -902,7 +931,7 @@ class MPVPlayer(
      * @see Player.Listener.onPlayerError
      */
     override fun getPlayerError(): PlaybackException? {
-        return null
+        return playerError
     }
 
     /**
