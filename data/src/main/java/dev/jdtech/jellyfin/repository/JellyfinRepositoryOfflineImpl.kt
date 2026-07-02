@@ -40,6 +40,16 @@ class JellyfinRepositoryOfflineImpl(
     private val appPreferences: AppPreferences,
 ) : JellyfinRepository {
 
+    private fun getUserId(): String {
+        return appPreferences.getValue(appPreferences.currentUserId)
+            ?: throw IllegalStateException("User ID not available")
+    }
+
+    private fun getCurrentServerId(): String {
+        return appPreferences.getValue(appPreferences.currentServer)
+            ?: throw IllegalStateException("No server selected")
+    }
+
     override suspend fun getPublicSystemInfo(): PublicSystemInfo {
         throw Exception("System info not available in offline mode")
     }
@@ -50,22 +60,22 @@ class JellyfinRepositoryOfflineImpl(
 
     override suspend fun getMovie(itemId: UUID): FindroidMovie =
         withContext(Dispatchers.IO) {
-            database.getMovie(itemId).toFindroidMovie(database, jellyfinApi.userId!!)
+            database.getMovie(itemId).toFindroidMovie(database, getUserId())
         }
 
     override suspend fun getShow(itemId: UUID): FindroidShow =
         withContext(Dispatchers.IO) {
-            database.getShow(itemId).toFindroidShow(database, jellyfinApi.userId!!)
+            database.getShow(itemId).toFindroidShow(database, getUserId())
         }
 
     override suspend fun getSeason(itemId: UUID): FindroidSeason =
         withContext(Dispatchers.IO) {
-            database.getSeason(itemId).toFindroidSeason(database, jellyfinApi.userId!!)
+            database.getSeason(itemId).toFindroidSeason(database, getUserId())
         }
 
     override suspend fun getEpisode(itemId: UUID): FindroidEpisode =
         withContext(Dispatchers.IO) {
-            database.getEpisode(itemId).toFindroidEpisode(database, jellyfinApi.userId!!)
+            database.getEpisode(itemId).toFindroidEpisode(database, getUserId())
         }
 
     override suspend fun getLibraries(): List<FindroidCollection> {
@@ -118,16 +128,16 @@ class JellyfinRepositoryOfflineImpl(
         return withContext(Dispatchers.IO) {
             val movies =
                 database
-                    .searchMovies(appPreferences.getValue(appPreferences.currentServer)!!, query)
-                    .map { it.toFindroidMovie(database, jellyfinApi.userId!!) }
+                    .searchMovies(getCurrentServerId(), query)
+                    .map { it.toFindroidMovie(database, getUserId()) }
             val shows =
                 database
-                    .searchShows(appPreferences.getValue(appPreferences.currentServer)!!, query)
-                    .map { it.toFindroidShow(database, jellyfinApi.userId!!) }
+                    .searchShows(getCurrentServerId(), query)
+                    .map { it.toFindroidShow(database, getUserId()) }
             val episodes =
                 database
-                    .searchEpisodes(appPreferences.getValue(appPreferences.currentServer)!!, query)
-                    .map { it.toFindroidEpisode(database, jellyfinApi.userId!!) }
+                    .searchEpisodes(getCurrentServerId(), query)
+                    .map { it.toFindroidEpisode(database, getUserId()) }
             movies + shows + episodes
         }
     }
@@ -140,13 +150,13 @@ class JellyfinRepositoryOfflineImpl(
         return withContext(Dispatchers.IO) {
             val movies =
                 database
-                    .getMoviesByServerId(appPreferences.getValue(appPreferences.currentServer)!!)
-                    .map { it.toFindroidMovie(database, jellyfinApi.userId!!) }
+                    .getMoviesByServerId(getCurrentServerId())
+                    .map { it.toFindroidMovie(database, getUserId()) }
                     .filter { it.playbackPositionTicks > 0 }
             val episodes =
                 database
-                    .getEpisodesByServerId(appPreferences.getValue(appPreferences.currentServer)!!)
-                    .map { it.toFindroidEpisode(database, jellyfinApi.userId!!) }
+                    .getEpisodesByServerId(getCurrentServerId())
+                    .map { it.toFindroidEpisode(database, getUserId()) }
                     .filter { it.playbackPositionTicks > 0 }
             movies + episodes
         }
@@ -159,7 +169,7 @@ class JellyfinRepositoryOfflineImpl(
     override suspend fun getSeasons(seriesId: UUID, offline: Boolean): List<FindroidSeason> =
         withContext(Dispatchers.IO) {
             database.getSeasonsByShowId(seriesId).map {
-                it.toFindroidSeason(database, jellyfinApi.userId!!)
+                it.toFindroidSeason(database, getUserId())
             }
         }
 
@@ -168,12 +178,12 @@ class JellyfinRepositoryOfflineImpl(
             val result = mutableListOf<FindroidEpisode>()
             val shows =
                 database
-                    .getShowsByServerId(appPreferences.getValue(appPreferences.currentServer)!!)
+                    .getShowsByServerId(getCurrentServerId())
                     .filter { if (seriesId != null) it.id == seriesId else true }
             for (show in shows) {
                 val episodes =
                     database.getEpisodesByShowId(show.id).map {
-                        it.toFindroidEpisode(database, jellyfinApi.userId!!)
+                        it.toFindroidEpisode(database, getUserId())
                     }
                 val indexOfLastPlayed = episodes.indexOfLast { it.played }
                 if (indexOfLastPlayed == -1) {
@@ -197,7 +207,7 @@ class JellyfinRepositoryOfflineImpl(
         withContext(Dispatchers.IO) {
             val items =
                 database.getEpisodesBySeasonId(seasonId).map {
-                    it.toFindroidEpisode(database, jellyfinApi.userId!!)
+                    it.toFindroidEpisode(database, getUserId())
                 }
             if (startItemId != null) return@withContext items.dropWhile { it.id != startItemId }
             items
@@ -239,19 +249,19 @@ class JellyfinRepositoryOfflineImpl(
         withContext(Dispatchers.IO) {
             when {
                 playedPercentage < 10 -> {
-                    database.setPlaybackPositionTicks(itemId, jellyfinApi.userId!!, 0)
-                    database.setPlayed(jellyfinApi.userId!!, itemId, false)
+                    database.setPlaybackPositionTicks(itemId, getUserId(), 0)
+                    database.setPlayed(getUserId(), itemId, false)
                 }
                 playedPercentage > 90 -> {
-                    database.setPlaybackPositionTicks(itemId, jellyfinApi.userId!!, 0)
-                    database.setPlayed(jellyfinApi.userId!!, itemId, true)
+                    database.setPlaybackPositionTicks(itemId, getUserId(), 0)
+                    database.setPlayed(getUserId(), itemId, true)
                 }
                 else -> {
-                    database.setPlaybackPositionTicks(itemId, jellyfinApi.userId!!, positionTicks)
-                    database.setPlayed(jellyfinApi.userId!!, itemId, false)
+                    database.setPlaybackPositionTicks(itemId, getUserId(), positionTicks)
+                    database.setPlayed(getUserId(), itemId, false)
                 }
             }
-            database.setUserDataToBeSynced(jellyfinApi.userId!!, itemId, true)
+            database.setUserDataToBeSynced(getUserId(), itemId, true)
         }
     }
 
@@ -261,37 +271,37 @@ class JellyfinRepositoryOfflineImpl(
         isPaused: Boolean,
     ) {
         withContext(Dispatchers.IO) {
-            database.setPlaybackPositionTicks(itemId, jellyfinApi.userId!!, positionTicks)
-            database.setUserDataToBeSynced(jellyfinApi.userId!!, itemId, true)
+            database.setPlaybackPositionTicks(itemId, getUserId(), positionTicks)
+            database.setUserDataToBeSynced(getUserId(), itemId, true)
         }
     }
 
     override suspend fun markAsFavorite(itemId: UUID) {
         withContext(Dispatchers.IO) {
-            database.setFavorite(jellyfinApi.userId!!, itemId, true)
-            database.setUserDataToBeSynced(jellyfinApi.userId!!, itemId, true)
+            database.setFavorite(getUserId(), itemId, true)
+            database.setUserDataToBeSynced(getUserId(), itemId, true)
         }
     }
 
     override suspend fun unmarkAsFavorite(itemId: UUID) {
         withContext(Dispatchers.IO) {
-            database.setFavorite(jellyfinApi.userId!!, itemId, false)
-            database.setUserDataToBeSynced(jellyfinApi.userId!!, itemId, true)
+            database.setFavorite(getUserId(), itemId, false)
+            database.setUserDataToBeSynced(getUserId(), itemId, true)
         }
     }
 
     override suspend fun markAsPlayed(itemId: UUID) {
         withContext(Dispatchers.IO) {
-            database.setPlayed(jellyfinApi.userId!!, itemId, true)
-            database.setPlaybackPositionTicks(itemId, jellyfinApi.userId!!, 0)
-            database.setUserDataToBeSynced(jellyfinApi.userId!!, itemId, true)
+            database.setPlayed(getUserId(), itemId, true)
+            database.setPlaybackPositionTicks(itemId, getUserId(), 0)
+            database.setUserDataToBeSynced(getUserId(), itemId, true)
         }
     }
 
     override suspend fun markAsUnplayed(itemId: UUID) {
         withContext(Dispatchers.IO) {
-            database.setPlayed(jellyfinApi.userId!!, itemId, false)
-            database.setUserDataToBeSynced(jellyfinApi.userId!!, itemId, true)
+            database.setPlayed(getUserId(), itemId, false)
+            database.setUserDataToBeSynced(getUserId(), itemId, true)
         }
     }
 
@@ -312,18 +322,18 @@ class JellyfinRepositoryOfflineImpl(
             val items = mutableListOf<FindroidItem>()
             items.addAll(
                 database
-                    .getMoviesByServerId(appPreferences.getValue(appPreferences.currentServer)!!)
-                    .map { it.toFindroidMovie(database, jellyfinApi.userId!!) }
+                    .getMoviesByServerId(getCurrentServerId())
+                    .map { it.toFindroidMovie(database, getUserId()) }
             )
             items.addAll(
                 database
-                    .getShowsByServerId(appPreferences.getValue(appPreferences.currentServer)!!)
-                    .map { it.toFindroidShow(database, jellyfinApi.userId!!) }
+                    .getShowsByServerId(getCurrentServerId())
+                    .map { it.toFindroidShow(database, getUserId()) }
             )
             items
         }
 
     override fun getUserId(): UUID {
-        return jellyfinApi.userId!!
+        return getUserId()
     }
 }

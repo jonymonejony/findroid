@@ -40,6 +40,7 @@ import dev.jdtech.jellyfin.models.User
     version = 8,
     autoMigrations =
         [
+            AutoMigration(from = 1, to = 2),
             AutoMigration(from = 2, to = 3),
             AutoMigration(from = 3, to = 4),
             AutoMigration(from = 4, to = 5, spec = ServerDatabase.TrickplayMigration::class),
@@ -61,7 +62,7 @@ val MIGRATION_6_7 =
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("DROP TABLE segments")
             db.execSQL(
-                "CREATE TABLE segments (`itemId` TEXT NOT NULL, `type` TEXT NOT NULL, `startTicks` INTEGER NOT NULL, `endTicks` INTEGER NOT NULL, PRIMARY KEY(`itemId`, `type`), FOREIGN KEY(`itemId`) REFERENCES `episodes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+                "CREATE TABLE segments (`itemId` TEXT NOT NULL, `type` TEXT NOT NULL, `startTicks` INTEGER NOT NULL, `endTicks` INTEGER NOT NULL, PRIMARY KEY(`itemId`, `type`))"
             )
         }
     }

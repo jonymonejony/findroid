@@ -291,16 +291,18 @@ constructor(
         Timber.d("Updating playback progress")
         viewModelScope.launch(Dispatchers.Main) {
             savedStateHandle["position"] = player.currentPosition
-            if (player.currentMediaItem != null && player.currentMediaItem!!.mediaId.isNotEmpty()) {
-                val itemId = UUID.fromString(player.currentMediaItem!!.mediaId)
-                try {
-                    repository.postPlaybackProgress(
-                        itemId,
-                        player.currentPosition.times(10000),
-                        !player.isPlaying,
-                    )
-                } catch (e: Exception) {
-                    Timber.e(e)
+            player.currentMediaItem?.let { mediaItem ->
+                if (mediaItem.mediaId.isNotEmpty()) {
+                    val itemId = UUID.fromString(mediaItem.mediaId)
+                    try {
+                        repository.postPlaybackProgress(
+                            itemId,
+                            player.currentPosition.times(10000),
+                            !player.isPlaying,
+                        )
+                    } catch (e: Exception) {
+                        Timber.e(e)
+                    }
                 }
             }
         }

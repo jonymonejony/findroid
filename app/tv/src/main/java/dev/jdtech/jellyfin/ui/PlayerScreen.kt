@@ -91,12 +91,12 @@ fun PlayerScreen(
             // Handle creation and release of media session
             when (lifecycle) {
                 Lifecycle.Event.ON_STOP -> {
-                    println("ON_STOP")
+                    Timber.d("ON_STOP")
                     mediaSession?.release()
                 }
 
                 Lifecycle.Event.ON_START -> {
-                    println("ON_START")
+                    Timber.d("ON_START")
                     mediaSession = MediaSession.Builder(context, viewModel.player).build()
                 }
 
