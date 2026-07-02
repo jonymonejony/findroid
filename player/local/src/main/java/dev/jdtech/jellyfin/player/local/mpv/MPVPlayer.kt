@@ -56,6 +56,8 @@ class MPVPlayer(
     videoOutput: String = "gpu-next",
     audioOutput: String = "aaudio",
     hwDec: String = "mediacodec",
+    gpuApi: String = "auto",
+    cacheSizeMB: Int = 512,
 ) : BasePlayer(), MPVLib.EventObserver, AudioManager.OnAudioFocusChangeListener {
     private val mpvLib: MPVLib
     private val audioManager: AudioManager by lazy { context.getSystemService()!! }
@@ -76,6 +78,8 @@ class MPVPlayer(
         videoOutput = builder.videoOutput,
         audioOutput = builder.audioOutput,
         hwDec = builder.hwDec,
+        gpuApi = builder.gpuApi,
+        cacheSizeMB = builder.cacheSizeMB,
     )
 
     class Builder(val context: Context) {
@@ -104,6 +108,12 @@ class MPVPlayer(
             private set
 
         var hwDec: String = "mediacodec"
+            private set
+
+        var gpuApi: String = "auto"
+            private set
+
+        var cacheSizeMB: Int = 512
             private set
 
         fun setAudioAttributes(audioAttributes: AudioAttributes, handleAudioFocus: Boolean) =
@@ -135,6 +145,10 @@ class MPVPlayer(
 
         fun setHwDec(hwDec: String) = apply { this.hwDec = hwDec }
 
+        fun setGpuApi(gpuApi: String) = apply { this.gpuApi = gpuApi }
+
+        fun setCacheSizeMB(cacheSizeMB: Int) = apply { this.cacheSizeMB = cacheSizeMB }
+
         fun build() = MPVPlayer(this)
     }
 
@@ -156,6 +170,11 @@ class MPVPlayer(
         mpvLib.setOptionString("ao", audioOutput)
         mpvLib.setOptionString("gpu-context", "android")
         mpvLib.setOptionString("opengl-es", "yes")
+        
+        // GPU API
+        if (gpuApi != "auto") {
+            mpvLib.setOptionString("gpu-api", gpuApi)
+        }
 
         // Hardware video decoding
         mpvLib.setOptionString("hwdec", hwDec)
@@ -167,8 +186,9 @@ class MPVPlayer(
         // Cache
         mpvLib.setOptionString("cache", "yes")
         mpvLib.setOptionString("cache-pause-initial", "yes")
-        mpvLib.setOptionString("demuxer-max-bytes", "64MiB")
-        mpvLib.setOptionString("demuxer-max-back-bytes", "32MiB")
+        val cacheBytes = cacheSizeMB * 1024 * 1024
+        mpvLib.setOptionString("demuxer-max-bytes", "${cacheBytes}")
+        mpvLib.setOptionString("demuxer-max-back-bytes", "${cacheBytes / 2}")
 
         // Subs
         mpvLib.setOptionString("sub-scale-with-window", "yes")

@@ -21,6 +21,9 @@
     <string name="pref_player_mpv_hwdec">Hardware decoding</string>
     <string name="pref_player_mpv_vo">Video output</string>
     <string name="pref_player_mpv_ao">Audio output</string>
+    <string name="pref_player_mpv_gpu_api">GPU API</string>
+    <string name="pref_player_cache_size">Player cache size</string>
+    <string name="pref_player_cache_size_summary">Amount of memory to use for buffering video content. Larger values might help with playback on slower networks.</string>
     <string name="pref_player_trickplay">Trickplay</string>
     <string name="pref_player_trickplay_summary">Display preview images while scrubbing</string>
     <string name="pref_player_chapter_markers">Chapter markers</string>
